@@ -19,110 +19,131 @@ def expected(buffer, matches):
         if buffer.find(match) < 0:
             raise Exception('Cannot find: %s \n%s' % (match, buffer))
 
+
 def run(args):
     print "Using CMD %s" % (args)
     c = pexpect.spawn(args)
     c.logfile = sys.stdout
     return c
 
-def test_success_state():
+
+def expect_code(flash0, flash1, error_type, error_code):
     cmd = "%s %s %s%s %s%s" % (
         QEMU, QEMU_OPTS,
-        QEMU_DRIVE, "/opt/spl-automate/content/flash0.signed",
-        QEMU_DRIVE, "/opt/spl-automate/content/flash1.signed"
+        QEMU_DRIVE, "%s/flashes/%s.CS0.%s" % (OUTPUT, FLASH_NAME, flash0),
+        QEMU_DRIVE, "%s/flashes/%s.CS1.%s" % (OUTPUT, FLASH_NAME, flash0),
     )
     c = run(cmd)
-
-    c.expect('\n=> ')
+    c.expect('Delete')
+    c.send('\x1b\x5b\x33\x7e')
+    c.expect('=> ')
     c.sendline('vbs')
     c.expect('\n=>', timeout=5)
     expected(c.before, [
-        'Status: type (0) code (0)'
+        'Status: type (%d) code (%d)' % (error_type, error_code)
+    ])
+    return c
+
+def test_success_state():
+    c = expect_code('0.0', '0.0', 0, 0)
+    expected(c.before, [
+        'recovery_boot:     0'
     ])
     c.close()
 
-def test_corrupted_uboot():
-    cmd = "%s %s %s%s %s%s" % (
-        QEMU, QEMU_OPTS,
-        QEMU_DRIVE, "/opt/spl-automate/content/flash0.signed",
-        QEMU_DRIVE, "/opt/spl-automate/content/flash1.corrupted-uboot"
-    )
-    c = run(cmd)
-    c.expect('\n=> ')
-    c.sendline('vbs')
-    c.expect('\n=> ')
-    # Will cause execute failure (since booting is allowed to continue)
-    expected(c.before, [
-        'Status: type (2) code (11)',
-        'Flags recovery_boot:     1',
-        'Flags recovery_retries:  1',
-    ])
+def test_bad_magic():
+    c = expect_code('3.30', '3.30', 3, 30)
+    c.close()
 
-def test_fake_subordinate():
-    cmd = "%s %s %s%s %s%s" % (
-        QEMU, QEMU_OPTS,
-        QEMU_DRIVE, "/opt/spl-automate/content/flash0.signed",
-        QEMU_DRIVE, "/opt/spl-automate/content/flash1.fake-subordinate"
-    )
-    c = run(cmd)
-    c.expect('\n=> ')
-    c.sendline('vbs')
-    c.expect('\n=> ')
-    expected(c.before, [
-        'Status: type (4) code (40)'
-    ])
+def test_no_images():
+    c = expect_code('3.31', '3.31', 3, 31)
+    c.close()
 
-def test_fake_signature():
-    cmd = "%s %s %s%s %s%s" % (
-        QEMU, QEMU_OPTS,
-        QEMU_DRIVE, "/opt/spl-automate/content/flash0.signed",
-        QEMU_DRIVE, "/opt/spl-automate/content/flash1.fake-signature"
-    )
-    c = run(cmd)
-    c.expect('\n=> ')
-    c.sendline('vbs')
-    c.expect('\n=> ')
-    expected(c.before, [
-        'Status: type (4) code (42)'
-    ])
+def test_no_firmware():
+    c = expect_code('3.32', '3.32', 3, 32)
+    c.close()
 
-def test_corrupted_fit():
-    cmd = "%s %s %s%s %s%s" % (
-        QEMU, QEMU_OPTS,
-        QEMU_DRIVE, "/opt/spl-automate/content/flash0.signed",
-        QEMU_DRIVE, "/opt/spl-automate/content/flash1.corrupted-fit"
-    )
-    c = run(cmd)
-    c.expect('\n=> ')
-    c.sendline('vbs')
-    c.expect('\n=> ')
-    expected(c.before, [
-        'Status: type (3) code (35)'
-    ])
+def test_no_config():
+    c = expect_code('3.33', '3.33', 3, 33)
+    c.close()
 
-def test_missing_flash1():
-    """In QEMU the second SPI chip will exists without content."""
-    cmd = "%s %s %s%s" % (
-        QEMU, QEMU_OPTS, QEMU_DRIVE, "/opt/spl-automate/content/flash0.signed"
-    )
-    c = run(cmd)
-    c.expect('\n=> ')
-    c.sendline('vbs')
-    c.expect('\n=> ')
-    expected(c.before, [
-        # Expect the VBS_ERROR_BAD_MAGIC error code.
-        'Status: type (3) code (30)',
-        'Flags recovery_retries:  1',
-        'Flags recovery_boot:     1',
-    ])
+def test_no_keys():
+    c = expect_code('3.35', '3.35', 3, 35)
+    c.close()
+
+def test_bad_keys():
+    c = expect_code('3.36', '3.36', 3, 36)
+    c.close()
+
+def test_bad_firmware_missing_position():
+    c = expect_code('3.37.1', '3.37.1', 3, 37)
+    c.close()
+
+def test_bad_firmware_missing_size():
+    c = expect_code('3.37.2', '3.37.2', 3, 37)
+    c.close()
+
+def test_bad_firmware_huge_size():
+    c = expect_code('3.37.3', '3.37.3', 3, 37)
+    c.close()
+
+def test_invalid_size():
+    c = expect_code('3.38', '3.38', 3, 38)
+    c.close()
+
+def test_keys_invalid_different_kek():
+    c = expect_code('4.40.1', '4.40.1', 4, 40)
+    c.close()
+
+def test_keys_invalid_bad_hint():
+    c = expect_code('4.40.2', '4.40.2', 4, 40)
+    c.close()
+
+def test_keys_invalid_bad_data():
+    c = expect_code('4.40.3', '4.40.3', 4, 40)
+    c.close()
+
+def test_firmware_invalid_bad_timestamp():
+    c = expect_code('4.42.1', '4.42.1', 4, 42)
+    c.close()
+
+def test_firmware_invalid_bad_hash():
+    c = expect_code('4.42.2', '4.42.2', 4, 42)
+    c.close()
+
+def test_firmware_invalid_bad_hint():
+    c = expect_code('4.42.3', '4.42.3', 4, 42)
+    c.close()
+
+def test_firmware_invalid_duplicate_hash():
+    c = expect_code('4.42.4', '4.42.4', 4, 42)
+    c.close()
+
+def test_firmware_unverified():
+    c = expect_code('4.43', '4.43', 4, 43)
     c.close()
 
 if __name__ == '__main__':
     QEMU = os.environ['QEMU']
+    OUTPUT = os.environ['OUTPUT']
+    FLASH_NAME = os.environ['FLASH_NAME']
 
-    test_missing_flash1()
-    test_corrupted_uboot()
-    test_corrupted_fit()
-    test_fake_subordinate()
-    test_fake_signature()
     test_success_state()
+    test_bad_magic()
+    test_no_images()
+    test_no_firmware()
+    test_no_config()
+    test_no_keys()
+    test_bad_keys()
+    test_bad_firmware_missing_position()
+    test_bad_firmware_missing_size()
+    test_bad_firmware_huge_size()
+    test_invalid_size()
+    test_keys_invalid_different_kek()
+    test_keys_invalid_bad_hint()
+    test_keys_invalid_bad_data()
+    test_firmware_invalid_bad_timestamp()
+    test_firmware_invalid_bad_hash()
+    test_firmware_invalid_bad_hint()
+    test_firmware_invalid_duplicate_hash()
+    test_firmware_unverified()

@@ -1,3 +1,9 @@
+language: c
+
+cache:
+  directories:
+  - /var/jenkins/sstate-cache
+
 addons:
   apt:
     update: true
@@ -23,4 +29,5 @@ before_script:
 script:
   - ./sync_yocto.sh
   - source ./openbmc-init-build-env meta-facebook/meta-${BOARD} build-${BOARD}
-
+  - echo "SSTATE_DIR = \"${CACHE}\"" >> ./conf/local.conf
+  - bitbake ${BOARD}-image

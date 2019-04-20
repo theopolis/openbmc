@@ -1,0 +1,24 @@
+addons:
+  apt:
+    update: true
+    packages:
+    - build-essential
+    - wget
+    - diffstat
+    - chrpath
+    - texinfo
+    - bzip2
+    - libthread-queue-perl
+
+env:
+  global:
+  - BOARD=fbtp
+  - CACHE="/var/jenkins/sstate-cache"
+  - OPENBMC=$PWD
+
+before_script:
+  - mkdir -p "${CACHE}"
+
+script:
+  - source ./openbmc-init-build-env meta-facebook/meta-${BOARD} build-${BOARD}
+

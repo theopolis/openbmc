@@ -1,0 +1,26 @@
+addons:
+  apt:
+    update: true
+    packages:
+    - build-essential
+    - wget
+    - diffstat
+    - chrpath
+    - texinfo
+    - bzip2
+    - libthread-queue-perl
+
+env:
+  global:
+  - BOARD=fbtp
+  - CACHE="/var/jenkins/sstate-cache"
+  - OPENBMC=$PWD
+
+before_script:
+  - sudo mkdir -p "${CACHE}"
+  - sudo chown $USER "${CACHE}"
+
+script:
+  - ./sync_yocto.sh
+  - source ./openbmc-init-build-env meta-facebook/meta-${BOARD} build-${BOARD}
+
